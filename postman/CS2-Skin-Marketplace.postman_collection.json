@@ -1,0 +1,392 @@
+{
+  "info": {
+    "_postman_id": "cs2-marketplace-api",
+    "name": "CS2 Skin Marketplace API",
+    "description": "Коллекция для проверки реализованных маршрутов.\n\nПорядок тестирования:\n1. Auth → Register (user)\n2. Auth → Login (user) — токен сохранится в переменную {{token}}\n3. Auth → Login (admin) — заполните {{adminEmail}} / {{adminPassword}}, токен сохранится в {{adminToken}}\n4. Дальше можно гонять Users / Skins / Upload / Negative.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5432/api" },
+    { "key": "token", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "skinId", "value": "" },
+    { "key": "adminEmail", "value": "" },
+    { "key": "adminPassword", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register (user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "pm.test('Password not in response', () => pm.expect(data.user).to.not.have.property('password'));",
+                  "if (data.user && data.user._id) { pm.collectionVariables.set('userId', data.user._id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser1\",\n  \"email\": \"testuser1@example.com\",\n  \"password\": \"123456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "description": "Создаёт user-аккаунт. Пароль хешируется bcrypt, в ответе password отсутствует."
+          }
+        },
+        {
+          "name": "Login (user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('Token received', () => pm.expect(data.token).to.be.a('string'));",
+                  "if (data.token) { pm.collectionVariables.set('token', data.token); }",
+                  "if (data.user && data.user._id) { pm.collectionVariables.set('userId', data.user._id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser1@example.com\",\n  \"password\": \"123456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Токен автоматически сохраняется в переменную {{token}}."
+          }
+        },
+        {
+          "name": "Login (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "if (data.token) { pm.collectionVariables.set('adminToken', data.token); pm.console.log('adminToken saved'); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Сначала заполните коллекционные переменные adminEmail и adminPassword (создаются через npm run seed с ADMIN_EMAIL/ADMIN_PASSWORD)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Users",
+      "item": [
+        {
+          "name": "GET all users",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] },
+            "description": "Список пользователей. Пароль в ответе не приходит."
+          }
+        },
+        {
+          "name": "GET user by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] }
+          }
+        },
+        {
+          "name": "POST create user",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"seconduser\",\n  \"email\": \"seconduser@example.com\",\n  \"password\": \"123456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] },
+            "description": "role и wallet через CRUD задать нельзя (Joi stripUnknown + деструктуризация)."
+          }
+        },
+        {
+          "name": "PATCH update user",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser1_updated\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] },
+            "description": "Разрешены только username / email / password."
+          }
+        },
+        {
+          "name": "PATCH ban user",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}/ban", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}", "ban"] },
+            "description": "Toggle: бан → разбан."
+          }
+        },
+        {
+          "name": "POST buy skin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skinId\": \"{{skinId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}/buy-skin", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}", "buy-skin"] },
+            "description": "Спишет из wallet стоимость скина (нужен баланс)."
+          }
+        },
+        {
+          "name": "POST sell skin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skinId\": \"{{skinId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}/sell-skin", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}", "sell-skin"] },
+            "description": "Вернёт 70% стоимости в wallet."
+          }
+        },
+        {
+          "name": "DELETE user",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] },
+            "description": "Запускать последним — user удалится."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Skins (admin only)",
+      "item": [
+        {
+          "name": "GET all skins",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "if (Array.isArray(data) && data.length > 0) { pm.collectionVariables.set('skinId', data[0]._id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/skins", "host": ["{{baseUrl}}"], "path": ["skins"] },
+            "description": "Первый _id сохраняется в {{skinId}}."
+          }
+        },
+        {
+          "name": "GET skin by id",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/skins/{{skinId}}", "host": ["{{baseUrl}}"], "path": ["skins", "{{skinId}}"] }
+          }
+        },
+        {
+          "name": "POST create skin (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "skinName", "value": "AK-47 | Neon Rider", "type": "text" },
+                { "key": "skinRarity", "value": "Epic", "type": "text" },
+                { "key": "skinPrice", "value": "99.99", "type": "text" },
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/skins", "host": ["{{baseUrl}}"], "path": ["skins"] },
+            "description": "Требуется токен админа. Поле file — картинка (jpg/png/gif/webp/avif/svg/bmp, до 5 МБ)."
+          }
+        },
+        {
+          "name": "PUT update skin (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "skinPrice", "value": "119.99", "type": "text" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/skins/{{skinId}}", "host": ["{{baseUrl}}"], "path": ["skins", "{{skinId}}"] }
+          }
+        },
+        {
+          "name": "DELETE skin (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": { "raw": "{{baseUrl}}/skins/{{skinId}}", "host": ["{{baseUrl}}"], "path": ["skins", "{{skinId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Upload",
+      "item": [
+        {
+          "name": "POST upload file",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": [] }]
+            },
+            "url": { "raw": "{{baseUrl}}/upload", "host": ["{{baseUrl}}"], "path": ["upload"] },
+            "description": "Возвращает путь /uploads/<filename>, файл открывается в браузере."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Negative tests",
+      "item": [
+        {
+          "name": "Register duplicate email -> 409",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"anothername\",\n  \"email\": \"testuser1@example.com\",\n  \"password\": \"123456\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "description": "Ожидается 409 Conflict."
+          }
+        },
+        {
+          "name": "Login wrong password -> 401",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser1@example.com\",\n  \"password\": \"wrong-password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Ожидается 401, одинаковый текст ошибки для неверного email и пароля."
+          }
+        },
+        {
+          "name": "User CRUD with role=admin in body -> role ignored",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"sneakyadmin\",\n  \"email\": \"sneaky@example.com\",\n  \"password\": \"123456\",\n  \"role\": \"admin\",\n  \"wallet\": 999999\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] },
+            "description": "Ожидается 201, но в ответе role=user и wallet=0 — role/wallet вырезаются."
+          }
+        },
+        {
+          "name": "GET user invalid id -> 400",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/users/not-an-id", "host": ["{{baseUrl}}"], "path": ["users", "not-an-id"] },
+            "description": "Ожидается 400, а не 500."
+          }
+        },
+        {
+          "name": "POST skin without token -> 401",
+          "request": {
+            "method": "POST",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "skinName", "value": "Hacked Skin", "type": "text" },
+                { "key": "skinRarity", "value": "Mythic", "type": "text" },
+                { "key": "skinPrice", "value": "1", "type": "text" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/skins", "host": ["{{baseUrl}}"], "path": ["skins"] },
+            "description": "Ожидается 401 Unauthorized."
+          }
+        },
+        {
+          "name": "POST skin with user token -> 403",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "skinName", "value": "Hacked Skin", "type": "text" },
+                { "key": "skinRarity", "value": "Mythic", "type": "text" },
+                { "key": "skinPrice", "value": "1", "type": "text" }
+              ]
+            },
+            "url": { "raw": "{{baseUrl}}/skins", "host": ["{{baseUrl}}"], "path": ["skins"] },
+            "description": "Ожидается 403 Forbidden (обычный пользователь не админ)."
+          }
+        },
+        {
+          "name": "PATCH user role change -> ignored",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\",\n  \"wallet\": 999999\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{userId}}"] },
+            "description": "Ожидается 400 — тело пустое после stripUnknown (нужен username/email/password)."
+          }
+        }
+      ]
+    }
+  ]
+}
