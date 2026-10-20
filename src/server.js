@@ -4,14 +4,16 @@ dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 require('dotenv').config();
 
-// JWT sekreti faqat .env da saqlanadi (kodda emas).
-// Agar bo'lmasa — serverni ishga tushirmasdan aniq xabar beramiz.
+// JWT sekreti faqat .env / Render Environment da saqlanadi (kodda emas).
+// Agar berilmasa — server o'lib qolmasin: vaqtinchalik tasodifiy secret
+// generatsiya qilamiz va ogohlantiramiz (har restartda tokenlar bekor bo'ladi).
 if (!process.env.JWT_SECRET) {
-    console.error(
-        "XATO: JWT_SECRET .env faylida topilmadi.\n" +
-        ".env.example ni nusxalab, JWT_SECRET qiymatini kiriting."
+    process.env.JWT_SECRET = require('crypto').randomBytes(48).toString('hex');
+    console.warn(
+        "OGOHLANTIRISH: JWT_SECRET berilmadi — vaqtinchalik tasodifiy secret ishlatildi.\n" +
+        "Render → Environment (yoki .env) da JWT_SECRET ni belgilang, aks holda\n" +
+        "har deploydan keyin foydalanuvchilar sessiyadan chiqib qoladi."
     );
-    process.exit(1);
 }
 
 const express = require('express');
