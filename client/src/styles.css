@@ -1617,3 +1617,187 @@ input[type="file"].input {
     max-width: none;
   }
 }
+
+/* ============ CS2 uslubidagi quti ochish ruletkasi ============ */
+.case-open-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(60% 50% at 50% 40%, rgba(255, 107, 0, 0.12), transparent),
+    rgba(4, 6, 12, 0.94);
+  backdrop-filter: blur(6px);
+  padding: 1.2rem;
+}
+
+.case-open-box {
+  width: min(960px, 100%);
+  padding: 1.6rem 1.4rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #111725, #0a0e18);
+  border: 1px solid #26314d;
+  box-shadow: 0 40px 90px -40px #000;
+  text-align: center;
+}
+
+.case-open-title {
+  margin: 0 0 1.2rem;
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #7db9ff, #fff, #7db9ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.case-open-window {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid #2a3550;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    #070a12;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.8);
+}
+
+/* Yonlardan gradient — lentaning chetlari ko'rinmasin */
+.case-open-window::before,
+.case-open-window::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 90px;
+  z-index: 2;
+  pointer-events: none;
+}
+.case-open-window::before {
+  left: 0;
+  background: linear-gradient(90deg, #070a12, transparent);
+}
+.case-open-window::after {
+  right: 0;
+  background: linear-gradient(270deg, #070a12, transparent);
+}
+
+.case-open-strip {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  width: max-content;
+  will-change: transform;
+}
+
+.case-open-item {
+  flex: 0 0 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border-radius: 10px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--rarity, #8a94ad) 14%, #0e1422),
+    #0b101c
+  );
+  border: 1px solid color-mix(in srgb, var(--rarity, #8a94ad) 45%, transparent);
+  transition: box-shadow 0.3s;
+}
+
+.case-open-item.is-win {
+  border-color: #ff3b30;
+  box-shadow:
+    0 0 0 2px rgba(255, 59, 48, 0.7),
+    0 0 34px color-mix(in srgb, var(--rarity, #ffd700) 70%, transparent);
+  animation: winPulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes winPulse {
+  to {
+    box-shadow:
+      0 0 0 2px rgba(255, 59, 48, 0.95),
+      0 0 54px color-mix(in srgb, var(--rarity, #ffd700) 90%, transparent);
+  }
+}
+
+.case-open-item .co-thumb {
+  width: 100%;
+  height: 74px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.case-open-item .co-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.case-open-item .thumb-fallback {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  font-size: 1.1rem;
+}
+
+.case-open-item .co-name {
+  font-size: 0.68rem;
+  color: #c8d2e8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Markaziy qizil darvoza (screenshotdagi ustun) */
+.case-open-gate {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  transform: translateX(-50%);
+  z-index: 3;
+  background: linear-gradient(180deg, #ff3b30, #ff6b00);
+  box-shadow: 0 0 14px rgba(255, 59, 48, 0.9);
+  pointer-events: none;
+}
+
+.gate-arrow {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ff3b30;
+  font-size: 0.8rem;
+  text-shadow: 0 0 8px rgba(255, 59, 48, 0.9);
+}
+.gate-arrow-top {
+  top: 3px;
+}
+.gate-arrow-bottom {
+  bottom: 3px;
+}
+
+.case-open-status {
+  margin: 1.1rem 0 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #8fa3c8;
+  animation: statusBlink 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes statusBlink {
+  to {
+    opacity: 0.45;
+  }
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import { useApp, formatMoney } from "../store.jsx";
 import { Loader, Empty, RarityBadge, SkinThumb, Modal, RARITIES } from "../ui.jsx";
@@ -13,6 +13,21 @@ const RARITY_UZ = {
   Legendary: "afsonaviy",
   Mythic: "mifologik",
 };
+
+// ---------- Ruletka (case opening) sozlamalari ----------
+// STRIP_LEN — lenta uzunligi (ta), SLOT — yutgan skin qaysi indeksda
+// (lentaning boshidan). Nechta item bo'lsa, Spin shuncha uzoqqa
+// suriladi va markazdagi darvozaga to'xtaydi.
+const STRIP_LEN = 70;
+const SLOT = 50;
+const SPIN_MS = 4800; // aylanish davomiyligi
+const MIN_UNLOCK_MS = 900; // "ochilmoqda..." minimally ko'rinadigan vaqt
+
+// Keshdagi pool dan tasodifiy lenta yig'adi (g'olib keyin SLOT ga qo'yiladi)
+const buildStrip = (pool) =>
+  Array.from({ length: STRIP_LEN }, () =>
+    pool.length ? pool[Math.floor(Math.random() * pool.length)] : null
+  );
 
 const ROUTES = [
   "GET /api/cases",
@@ -72,7 +87,9 @@ export default function Cases() {
   const [cases, setCases] = useState(null); // null = yuklanmoqda
   const [busyId, setBusyId] = useState(null);
   const [drop, setDrop] = useState(null); // ochilgan natija
-  const [rolling, setRolling] = useState(null); // aylantirish holati (keySpin)
+  const [rolling, setRolling] = useState(null); // ruletka: {phase: unlock|spin, ...}
+  const stripRef = useRef(null); // lenta elementi (transform animatsiya)
+  const spinDoneRef = useRef(false); // finish faqat bir marta chaqirilsin
 
   const load = useCallback(async () => {
     try {
@@ -96,15 +113,34 @@ export default function Cases() {
     }
 
     setBusyId(c._id);
-    // Kazino usulida key aylantirish animatsiyasi
-    setRolling({ caseId: c._id, start: Date.now() });
+    // 1-faza: "Quti ochilmoqda..." — lenta tasodifiy itemlar bilan ko'rinadi,
+    // API javobi kelguncha kamida MIN_UNLOCK_MS ko'rinadi.
+    const pool = (c.skins || []).map((i) => i.skin).filter(Boolean);
+    spinDoneRef.current = false;
+    setRolling({ caseId: c._id, caseName: c.caseName, phase: "unlock", strip: buildStrip(pool) });
+
+    const t0 = Date.now();
     try {
       const d = await api(`/api/cases/${c._id}/open`, { method: "POST" });
       // Tanga yechildi + tushgan skin inventarga tushdi — holatni yangilaymiz
       setUser({ ...user, wallet: d.wallet, skins: d.skins ?? user.skins });
-      setDrop({ caseName: c.caseName, ...d, caseId: c._id });
       toast(`Key ochildi!`, "ok");
+
+      // 2-faza: g'olibni SLOT indeksiga qo'yib, lentani aylantiramiz.
+      const wait = Math.max(0, MIN_UNLOCK_MS - (Date.now() - t0));
+      window.setTimeout(() => {
+        setRolling(
+          (prev) =>
+            prev && {
+              ...prev,
+              phase: "spin",
+              winner: d.dropped?.skin || null,
+              result: d,
+            }
+        );
+      }, wait);
     } catch (e) {
+      setRolling(null);
       if (e.status === 401) {
         setPage("auth");
         toast("Sessiya tugagan — qayta tizimga kiring", "err");
@@ -113,9 +149,50 @@ export default function Cases() {
       }
     } finally {
       setBusyId(null);
-      setRolling(null);
     }
   };
+
+  // Aylanish tugadi → natija popupini ko'rsatamiz (faqat bir marta)
+  const finishSpin = useCallback(() => {
+    if (spinDoneRef.current || !rolling || rolling.phase !== "spin") return;
+    spinDoneRef.current = true;
+    setDrop({ caseName: rolling.caseName, ...rolling.result, caseId: rolling.caseId });
+    setRolling(null);
+  }, [rolling]);
+
+  // 2-faza boshlanganda: transform ni 0 dan g'olib darvozagacha ease-out bilan
+  // suramiz. transitionend + zaxira taymer (tab fonda bo'lsa ham yakunlanadi).
+  useEffect(() => {
+    if (rolling?.phase !== "spin") return;
+    const el = stripRef.current;
+    if (!el || el.children.length === 0) return;
+    spinDoneRef.current = false;
+
+    const n = el.children.length;
+    const winIdx = Math.min(SLOT, n - 1);
+    const stride =
+      n > 1 ? el.children[1].offsetLeft - el.children[0].offsetLeft : 142;
+    const win = el.children[winIdx];
+    const boxW = el.parentElement.clientWidth;
+    const target = boxW / 2 - (win.offsetLeft + win.offsetWidth / 2);
+
+    el.style.transition = "none";
+    el.style.transform = "translateX(0px)";
+    void el.offsetWidth; // reflow — yangi boshlanish nuqtasini majburlaymiz
+    el.style.transition = `transform ${SPIN_MS}ms cubic-bezier(0.1, 0.72, 0.1, 1)`;
+    el.style.transform = `translateX(${target}px)`;
+
+    const onEnd = (e) => {
+      if (e.propertyName === "transform") finishSpin();
+    };
+    el.addEventListener("transitionend", onEnd);
+    const guard = window.setTimeout(finishSpin, SPIN_MS + 800);
+    return () => {
+      el.removeEventListener("transitionend", onEnd);
+      window.clearTimeout(guard);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rolling?.phase]);
 
   if (cases === null) return <Loader text="Keyslar yuklanmoqda..." />;
 
@@ -223,6 +300,56 @@ export default function Cases() {
           </button>
         </div>
       </section>
+
+      {/* ---------- CS2 uslubidagi quti ochish ruletkasi ---------- */}
+      {rolling && (
+        <div className="case-open-overlay">
+          <div className="case-open-box">
+            <h2 className="case-open-title">Omadingni sinang!</h2>
+            <div className="case-open-window">
+              <div
+                className="case-open-strip"
+                ref={stripRef}
+                data-phase={rolling.phase}
+              >
+                {rolling.strip.map((s, i) => {
+                  const skin =
+                    rolling.phase === "spin" && i === SLOT
+                      ? rolling.winner
+                      : s;
+                  const isWin =
+                    rolling.phase === "spin" && i === SLOT && !!rolling.winner;
+                  const r = rarityColor(skin?.skinRarity);
+                  return (
+                    <div
+                      key={i}
+                      className={`case-open-item${isWin ? " is-win" : ""}`}
+                      style={{ "--rarity": r }}
+                    >
+                      <div className="co-thumb">
+                        <SkinThumb skin={skin} />
+                      </div>
+                      <span className="co-name">
+                        {skin?.skinName?.split("|").pop()?.trim() || "?"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Markazdagi qizil darvoza — g'olib shu yerga to'xtaydi */}
+              <div className="case-open-gate" aria-hidden="true">
+                <span className="gate-arrow gate-arrow-top">▼</span>
+                <span className="gate-arrow gate-arrow-bottom">▲</span>
+              </div>
+            </div>
+            <p className="case-open-status">
+              {rolling.phase === "unlock"
+                ? "Quti ochilmoqda..."
+                : "Omadingni tekshirish..."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tushgan skin natijasi - kazino uslubida kichik popup */}
       {drop && (
